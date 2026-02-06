@@ -16,7 +16,7 @@ export function useBodyModelRigging(
   mirrored: boolean = true
 ) {
 
-  
+
   // Store ALL bones by name pattern (handles multiple armatures)
   const armBonesRef = useRef<{
     upperarm_l: Bone[];
@@ -25,7 +25,10 @@ export function useBodyModelRigging(
     lowerarm_r: Bone[];
   } | null>(null);
 
-  
+
+
+  // Store rest pose rotations for each bone (keyed by bone name)
+  const restRotationsRef = useRef<Map<string, Euler>>(new Map());
 
   const smoothRotations = useRef<Map<string, Euler>>(new Map());
   const initializedRef = useRef(false);
@@ -50,49 +53,49 @@ export function useBodyModelRigging(
 
           // Match upperarm_l (but not twist, corrective, etc.)
           if (name.includes('upperarm_l') &&
-              !name.includes('twist') &&
-              !name.includes('corrective') &&
-              !name.includes('_in') &&
-              !name.includes('_out') &&
-              !name.includes('_fwd') &&
-              !name.includes('_bck') &&
-              !name.includes('bicep') &&
-              !name.includes('tricep')) {
+            !name.includes('twist') &&
+            !name.includes('corrective') &&
+            !name.includes('_in') &&
+            !name.includes('_out') &&
+            !name.includes('_fwd') &&
+            !name.includes('_bck') &&
+            !name.includes('bicep') &&
+            !name.includes('tricep')) {
             upperarm_l.push(bone);
           }
 
           // Match upperarm_r
           if (name.includes('upperarm_r') &&
-              !name.includes('twist') &&
-              !name.includes('corrective') &&
-              !name.includes('_in') &&
-              !name.includes('_out') &&
-              !name.includes('_fwd') &&
-              !name.includes('_bck') &&
-              !name.includes('bicep') &&
-              !name.includes('tricep')) {
+            !name.includes('twist') &&
+            !name.includes('corrective') &&
+            !name.includes('_in') &&
+            !name.includes('_out') &&
+            !name.includes('_fwd') &&
+            !name.includes('_bck') &&
+            !name.includes('bicep') &&
+            !name.includes('tricep')) {
             upperarm_r.push(bone);
           }
 
           // Match lowerarm_l
           if (name.includes('lowerarm_l') &&
-              !name.includes('twist') &&
-              !name.includes('corrective') &&
-              !name.includes('_in') &&
-              !name.includes('_out') &&
-              !name.includes('_fwd') &&
-              !name.includes('_bck')) {
+            !name.includes('twist') &&
+            !name.includes('corrective') &&
+            !name.includes('_in') &&
+            !name.includes('_out') &&
+            !name.includes('_fwd') &&
+            !name.includes('_bck')) {
             lowerarm_l.push(bone);
           }
 
           // Match lowerarm_r
           if (name.includes('lowerarm_r') &&
-              !name.includes('twist') &&
-              !name.includes('corrective') &&
-              !name.includes('_in') &&
-              !name.includes('_out') &&
-              !name.includes('_fwd') &&
-              !name.includes('_bck')) {
+            !name.includes('twist') &&
+            !name.includes('corrective') &&
+            !name.includes('_in') &&
+            !name.includes('_out') &&
+            !name.includes('_fwd') &&
+            !name.includes('_bck')) {
             lowerarm_r.push(bone);
           }
         });
@@ -100,6 +103,12 @@ export function useBodyModelRigging(
     });
 
     armBonesRef.current = { upperarm_l, upperarm_r, lowerarm_l, lowerarm_r };
+
+    // Capture rest pose rotations before we start modifying them
+    const allBones = [...upperarm_l, ...upperarm_r, ...lowerarm_l, ...lowerarm_r];
+    allBones.forEach(bone => {
+      restRotationsRef.current.set(bone.name, bone.rotation.clone());
+    });
 
     console.log('[Rigging] Found bones:', {
       upperarm_l: upperarm_l.map(b => b.name),
@@ -124,7 +133,7 @@ export function useBodyModelRigging(
       const degStr = (bone: Bone | undefined) => {
         if (!bone) return 'N/A';
         const r = bone.rotation;
-        return `X:${(r.x * 180/Math.PI).toFixed(1)} Y:${(r.y * 180/Math.PI).toFixed(1)} Z:${(r.z * 180/Math.PI).toFixed(1)}`;
+        return `X:${(r.x * 180 / Math.PI).toFixed(1)} Y:${(r.y * 180 / Math.PI).toFixed(1)} Z:${(r.z * 180 / Math.PI).toFixed(1)}`;
       };
       console.log('[DEBUG] Initial bone rotations (degrees):', {
         upperarm_l: degStr(armBones.upperarm_l[0]),
@@ -140,10 +149,11 @@ export function useBodyModelRigging(
     const m = mirrored ? -1 : 1;
 
     // Helper to apply rotation to ALL bones in array
+    // Preserves rest pose X/Y rotations, Z is applied as absolute
     const applyRotationToAll = (bones: Bone[], key: string, x: number, y: number, z: number) => {
       if (bones.length === 0) return;
 
-      // Smooth the rotation
+      // Smooth the rotation values
       let smooth = smoothRotations.current.get(key);
       if (!smooth) {
         smooth = new Euler(x, y, z);
@@ -155,9 +165,11 @@ export function useBodyModelRigging(
       }
 
       // Apply to ALL matching bones
+      // Keep rest X/Y (preserves arm plane orientation), Z is absolute from pose
       bones.forEach(bone => {
-        bone.rotation.x = smooth!.x;
-        bone.rotation.y = smooth!.y;
+        const rest = restRotationsRef.current.get(bone.name);
+        bone.rotation.x = (rest ? rest.x : 0) + smooth!.x;
+        bone.rotation.y = (rest ? rest.y : 0) + smooth!.y;
         bone.rotation.z = smooth!.z;
         bone.updateMatrix();
         bone.updateMatrixWorld(true);
@@ -197,58 +209,81 @@ export function useBodyModelRigging(
     const rElbow = mirrored ? pose[L.LEFT_ELBOW] : pose[L.RIGHT_ELBOW];
     const rWrist = mirrored ? pose[L.LEFT_WRIST] : pose[L.RIGHT_WRIST];
 
+    // Get the rest pose Z rotation for each arm bone type
+    const getRestZ = (bones: Bone[]): number => {
+      if (bones.length === 0) return 0;
+      const rest = restRotationsRef.current.get(bones[0].name);
+      return rest ? rest.z : 0;
+    };
+
+    // Calculate vertical angle: 0 = arm horizontal, positive = arm pointing up, negative = arm pointing down
+    // For arms at sides (natural standing), dy will be negative (elbow below shoulder)
+    const calcVerticalAngle = (shoulderPos: typeof lShoulder, elbowPos: typeof lElbow): number => {
+      const dy = -(elbowPos.y - shoulderPos.y); // positive = up
+      const dx = Math.abs(elbowPos.x - shoulderPos.x); // horizontal distance
+      // atan2 gives angle from horizontal: 0=horizontal, PI/2=up, -PI/2=down
+      return Math.atan2(dy, dx);
+    };
+
     // LEFT UPPER ARM
     {
-      // Direction from shoulder to elbow (only X and Y for up/down motion)
-      const dx = (lElbow.x - lShoulder.x) * m * 415; // horizontal (left/right)
-      const dy = -(lElbow.y - lShoulder.y);    // vertical (up is positive now)
+      // Calculate current arm angle from MediaPipe pose
+      const verticalAngle = calcVerticalAngle(lShoulder, lElbow);
 
-      // Z rotation: swings arm up/down (in frontal plane)
-      // For left arm pointing left and down in A-pose, we need proper angle mapping
-      const armAngle = Math.atan2(dy, Math.abs(dx)); // angle from horizontal
-      // Map so that: arm down = small rotation, arm up = large rotation
-      const zRot = armAngle - Math.PI/6; // small offset for A-pose rest position
+      // When arms are at sides naturally: verticalAngle ≈ -PI/2 (pointing down)
+      // When arms horizontal (T-pose): verticalAngle ≈ 0
+      // When arms straight up: verticalAngle ≈ PI/2
 
-      // No Y rotation - we only want up/down motion, no forward/back
+      // The model's rest pose Z rotation already positions the arm correctly at rest
+      // We just need to add the delta from natural arms-down position
+      // Natural standing = arm angle of about -80 to -90 degrees from horizontal
+      const restAngle = -Math.PI / 2; // Arms down = -90 degrees from horizontal
+      const deltaAngle = verticalAngle - restAngle;
+
+      // For left arm, positive delta should rotate arm up (positive Z)
+      const zRot = getRestZ(armBones.upperarm_l) + deltaAngle;
+
       applyRotationToAll(armBones.upperarm_l, 'upperarm_l', 0, 0, zRot);
     }
 
     // LEFT LOWER ARM (relative to upper arm direction)
     {
-      const dx = (lWrist.x - lElbow.x) * m;
       const dy = -(lWrist.y - lElbow.y);
+      const dx = Math.abs(lWrist.x - lElbow.x);
 
-      // Forearm bend angle
-      const armAngle = Math.atan2(dy, Math.abs(dx));
-      const zRot = armAngle * 0.6; // reduced to avoid over-rotation
+      // Forearm angle relative to upper arm
+      const forearmAngle = Math.atan2(dy, dx);
+      const restAngle = -Math.PI / 2; // Forearm also pointing down at rest
+      const deltaAngle = forearmAngle - restAngle;
 
-      // No Y rotation - only up/down motion
+      const zRot = getRestZ(armBones.lowerarm_l) + deltaAngle * 0.7;
+
       applyRotationToAll(armBones.lowerarm_l, 'lowerarm_l', 0, 0, zRot);
     }
 
     // RIGHT UPPER ARM
     {
-      const dx = (rElbow.x - rShoulder.x) * m;
-      const dy = -(rElbow.y - rShoulder.y);
+      const verticalAngle = calcVerticalAngle(rShoulder, rElbow);
+      const restAngle = -Math.PI / 2;
+      const deltaAngle = verticalAngle - restAngle;
 
-      // Z rotation for right arm (mirrored from left)
-      const armAngle = Math.atan2(dy, Math.abs(dx));
-      const zRot = -(armAngle - Math.PI/6); // negative for right side
+      // For right arm, the rotation direction is opposite (negative Z to go up)
+      const zRot = getRestZ(armBones.upperarm_r) - deltaAngle;
 
-      // No Y rotation - only up/down motion
       applyRotationToAll(armBones.upperarm_r, 'upperarm_r', 0, 0, zRot);
     }
 
     // RIGHT LOWER ARM
     {
-      const dx = (rWrist.x - rElbow.x) * m;
       const dy = -(rWrist.y - rElbow.y);
+      const dx = Math.abs(rWrist.x - rElbow.x);
 
-      // Forearm bend angle (mirrored from left)
-      const armAngle = Math.atan2(dy, Math.abs(dx));
-      const zRot = -armAngle * 0.6;
+      const forearmAngle = Math.atan2(dy, dx);
+      const restAngle = -Math.PI / 2;
+      const deltaAngle = forearmAngle - restAngle;
 
-      // No Y rotation - only up/down motion
+      const zRot = getRestZ(armBones.lowerarm_r) - deltaAngle * 0.7;
+
       applyRotationToAll(armBones.lowerarm_r, 'lowerarm_r', 0, 0, zRot);
     }
 
