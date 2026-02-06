@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { Group, Vector3, Quaternion, Bone, SkinnedMesh, Skeleton, Matrix4 } from 'three';
-import { Results } from '@mediapipe/pose';
+import { Group, Vector3, Quaternion, Bone, SkinnedMesh, Skeleton } from 'three';
+import type { Results } from '@mediapipe/pose';
 import {
   LANDMARKS,
-  landmarkToScreen,
   landmarkTo3D,
   landmarkMidpoint,
   normalizedShoulderWidth,
@@ -11,7 +10,6 @@ import {
   bodyTurnAngle,
   quaternionFromDirections,
   findBone,
-  landmarkDirection,
 } from '../utils/boneMapping';
 
 const SMOOTH = 0.15;
@@ -19,10 +17,6 @@ const BONE_SMOOTH = 0.15;
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
-}
-
-function slerpQuaternion(from: Quaternion, to: Quaternion, t: number): Quaternion {
-  return from.clone().slerp(to, t);
 }
 
 interface BoneState {
@@ -66,14 +60,15 @@ export function useJacketRigging(
   useEffect(() => {
     if (!jacketModel) return;
 
-    let skeleton: Skeleton | null = null;
+    let foundSkeleton: Skeleton | null = null;
     jacketModel.traverse((child) => {
       if (child instanceof SkinnedMesh && child.skeleton) {
-        skeleton = child.skeleton;
+        foundSkeleton = child.skeleton;
       }
     });
 
-    if (skeleton) {
+    if (foundSkeleton) {
+      const skeleton = foundSkeleton as Skeleton;
       skeletonRef.current = skeleton;
       // Store rest poses for all bones
       const restPoses = new Map<string, Quaternion>();
@@ -82,7 +77,7 @@ export function useJacketRigging(
       });
       restPosesRef.current = restPoses;
       console.log('[useJacketRigging] Found skeleton with', skeleton.bones.length, 'bones');
-      console.log('[useJacketRigging] Key bones:', skeleton.bones.map(b => b.name).filter(n =>
+      console.log('[useJacketRigging] Key bones:', skeleton.bones.map((b: Bone) => b.name).filter((n: string) =>
         /^(spine|pelvis|clavicle|upperarm|lowerarm|hand|neck|head|root)/.test(n)
       ));
     } else {

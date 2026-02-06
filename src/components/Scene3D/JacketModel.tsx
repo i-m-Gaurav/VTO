@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { Group, SkinnedMesh } from 'three';
+import { Group, SkinnedMesh, Mesh } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { useTextureSwap } from '../../hooks/useTextureSwap';
 

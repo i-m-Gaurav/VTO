@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
-import { Results } from '@mediapipe/pose';
+import type { Results } from '@mediapipe/pose';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { POSE_CONNECTIONS } from '@mediapipe/pose';
 
 interface Props {
-  canvasRef: React.RefObject<HTMLCanvasElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
   landmarks: Results | null;
 }
 

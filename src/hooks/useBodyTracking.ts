@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pose, Results } from '@mediapipe/pose';
+import { Pose } from '@mediapipe/pose';
+import type { Results } from '@mediapipe/pose';
 import { Camera } from '@mediapipe/camera_utils';
 
-export function useBodyTracking(videoRef: React.RefObject<HTMLVideoElement>) {
+export function useBodyTracking(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const [landmarks, setLandmarks] = useState<Results | null>(null);
   const poseRef = useRef<Pose | null>(null);
   const cameraRef = useRef<Camera | null>(null);

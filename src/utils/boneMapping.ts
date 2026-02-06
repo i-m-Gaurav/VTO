@@ -1,4 +1,4 @@
-import { NormalizedLandmark } from '@mediapipe/pose';
+import type { NormalizedLandmark } from '@mediapipe/pose';
 import { Vector3, Quaternion, Bone, Skeleton } from 'three';
 
 // MediaPipe landmark indices
