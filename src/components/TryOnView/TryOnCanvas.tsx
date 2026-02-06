@@ -8,6 +8,7 @@ import { useBodyModelRigging } from '../../hooks/useBodyModelRigging';
 import { useTextureSwap } from '../../hooks/useTextureSwap';
 import { BodyOverlay } from '../WebcamView/BodyOverlay';
 import { useAppStore } from '../../stores/appStore';
+import { DebugPanel } from '../UI/DebugPanel';
 import type { BodyModelType } from '../../stores/appStore';
 
 const ASPECT = 16 / 9;
@@ -72,6 +73,7 @@ export function TryOnCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [bodyModel, setBodyModelState] = useState<Group | null>(null);
   const [showSkeleton, setShowSkeleton] = useState(true);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -321,6 +323,14 @@ export function TryOnCanvas() {
         >
           {showSkeleton ? 'Hide' : 'Show'} Skeleton
         </button>
+
+        {/* Debug Panel toggle */}
+        <button
+          onClick={() => setShowDebugPanel(!showDebugPanel)}
+          className="bg-purple-600/70 backdrop-blur px-4 py-2 rounded-lg text-white text-sm hover:bg-purple-600 transition"
+        >
+          🎛️ {showDebugPanel ? 'Hide' : 'Show'} Sliders
+        </button>
       </div>
 
       {/* Error message */}
@@ -348,6 +358,9 @@ export function TryOnCanvas() {
           </div>
         </div>
       )}
+
+      {/* Debug Panel - shown/hidden via toggle */}
+      {showDebugPanel && <DebugPanel />}
     </div>
   );
 }
