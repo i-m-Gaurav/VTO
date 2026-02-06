@@ -11,3 +11,18 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth scroll for fabric selector */
+.scroll-smooth {
+  scroll-behavior: smooth;
+}

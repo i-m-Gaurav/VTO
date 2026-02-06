@@ -230,19 +230,43 @@ export function useBodyModelRigging(
     // === Body position and scale ===
     const leftShoulder = pose[L.LEFT_SHOULDER];
     const rightShoulder = pose[L.RIGHT_SHOULDER];
-    const leftHip = pose[L.LEFT_HIP];
-    const rightHip = pose[L.RIGHT_HIP];
-
-    const hipX = ((leftHip.x + rightHip.x) / 2 - 0.5) * m;
-    const hipY = -((leftHip.y + rightHip.y) / 2 - 0.5);
 
     const shoulderWidth = Math.sqrt(
       Math.pow(leftShoulder.x - rightShoulder.x, 2) +
       Math.pow(leftShoulder.y - rightShoulder.y, 2)
     );
 
-    model.position.set(hipX * 3, hipY * 3 - 0.4, 0);
-    model.scale.setScalar(shoulderWidth * 5.5);
+    // === CONSTRAINTS ===
+    // Position constraints - keep model within the viewport box
+    const MIN_X = -0.6;
+    const MAX_X = 0.6;
+    const MIN_Y = -7.0;  // Allow model to go lower to show head
+    const MAX_Y = 0.9;
+
+    // Scale constraints - larger scale to show just upper body
+    const MIN_SCALE = 0.6;   // Minimum scale (zoomed in more)
+    const MAX_SCALE = 1.8;   // Maximum scale
+
+    // Calculate raw values
+    // Use shoulder center for positioning (more stable for upper body view)
+    const shoulderCenterX = ((leftShoulder.x + rightShoulder.x) / 2 - 0.5) * m;
+    const shoulderCenterY = -((leftShoulder.y + rightShoulder.y) / 2 - 0.5);
+
+    const rawX = shoulderCenterX * 2;
+    // Shift the model DOWN significantly so we see the FACE and torso
+    // Large negative offset to bring head into view
+    const rawY = shoulderCenterY * 2 - 2.5;  // Even larger offset DOWN to show face
+
+    // Larger scale to zoom in on upper body
+    const rawScale = shoulderWidth * 8;
+
+    // Apply constraints
+    const clampedX = Math.max(MIN_X, Math.min(MAX_X, rawX));
+    const clampedY = Math.max(MIN_Y, Math.min(MAX_Y, rawY));
+    const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, rawScale));
+
+    model.position.set(clampedX, clampedY, 0);
+    model.scale.setScalar(clampedScale);
 
     // Keep model facing forward (no body turn)
     model.rotation.y = 0;
